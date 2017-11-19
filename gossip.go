@@ -1,6 +1,7 @@
 package gossip
 
 import (
+	"path/filepath"
 	"strconv"
 	"net"
 	"gitlab.com/n-canter/graph"
@@ -8,6 +9,7 @@ import (
 	"time"
 	"log"
 	"os"
+	"sync"
 )
 
 const (
@@ -31,6 +33,8 @@ type GossipNode struct {
 	receiver 	*Receiver
 	sender 		*Sender
 	processor 	*nodeProcessor
+	counter 	int
+	m 			sync.Mutex
 }
 
 // NewGossipNode constracts new GossipNode based on its graph place.
@@ -42,6 +46,7 @@ func NewGossipNode (id int, port int, neighs []graph.Node) *GossipNode {
 		receiver: 	nil,
 		sender: 	nil,
 		processor: 	newNodeProcessor(id, neighs),
+		counter: 	0,
 	}
 }
 
@@ -70,7 +75,10 @@ func (gn *GossipNode) Unbind() {
 
 func (gn *GossipNode) putNewRumour(msg Message, netSize int) (exists bool) {
 	// give a command to processor to put message in the queue and start tracking it
-	return gn.processor.initNewMessage(msg, netSize) 
+	gn.m.Lock()
+	c := gn.counter
+	gn.m.Unlock()
+	return gn.processor.initNewMessage(msg, netSize, c) 
 }
 
 // Process sends messages to random peers every interval and processes incoming messages
@@ -84,16 +92,17 @@ func (gn *GossipNode) Process(kill chan struct{}, interval time.Duration) {
 	defer gn.receiver.Stop()
 	gn.sender.Start()
 	defer gn.sender.Stop()
-	counter := 0
 	for {
 		select {
 		case <-kill:  // got stop signal
 			return
 		case msg := <-gn.receiver.C: // got some message from receiver
 			logger.Printf("[NODE %d] message received %s", gn.id, msg.String())
-			gn.processor.processMsg(msg)
+			gn.processor.processMsg(msg, gn.counter)
 		case <-ticker.C:  // time for new round
-			counter++
+			gn.m.Lock()
+			gn.counter++
+			gn.m.Unlock()
 			msg, addr, empty := gn.processor.getRandomMsg()
 			if !empty {
 				logger.Printf("[NODE %d] sending to address %s message %s", gn.id, addr, msg)
@@ -114,11 +123,13 @@ type GossipNet struct {
 	size  int
 	nodes []*GossipNode
 	kill  chan struct{}
+	round time.Duration
 }
 
 func initLogger(logDirectoryPath string) *log.Logger {
 	var err error
-	logfile, _ = os.OpenFile(logDirectoryPath + "session_" + time.Now().Format("20060102150405") + ".log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	filename := "session_" + time.Now().Format("20060102150405") + ".log";
+	logfile, _ = os.OpenFile(filepath.Join(logDirectoryPath, filename), os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
 	if err != nil {fmt.Println("Couldn't open file")}
 	return log.New(logfile, "TRACE:", log.Ltime)
 }
@@ -129,7 +140,7 @@ func closeLogger() {
 }
 
 // InitNet generates random net of size n. It uses graph package to create graph.
-func InitNet(n int) *GossipNet {
+func InitNet(n int, interval time.Duration) *GossipNet {
 	g := graph.Generate(n, 1, 5, BASE_PORT)
 	GNs := make([]*GossipNode, 0, n)
 	for i := 0; i < n; i++ {
@@ -144,12 +155,13 @@ func InitNet(n int) *GossipNet {
 		size: n,
 		nodes: GNs,
 		kill: make(chan struct{}, n),
+		round: interval,
 	}
 }
 
 // InitNetFromGraph generates net from input graph of package graph.
 // NOTE: It doesn't check the graph correctness.
-func InitNetFromGraph(g graph.Graph) *GossipNet {
+func InitNetFromGraph(g graph.Graph, interval time.Duration) *GossipNet {
 	n := len(g)
 	GNs := make([]*GossipNode, 0, n)
 	for i := 0; i < n; i++ {
@@ -164,21 +176,21 @@ func InitNetFromGraph(g graph.Graph) *GossipNet {
 		size: n,
 		nodes: GNs,
 		kill: make(chan struct{}, n),
+		round: interval,
 	}
 }
 
 
-// TODO: interval as parameter of the net
-// TODO: logger filepath as parameter of Start()
+// TODO: interval as parameter of the net 			DONE
+// TODO: logger filepath as parameter of Start()	DONE
 
 // Start lanches the gossip simulation. Also it inits the session logger.
 // Each node is launched in the sepotare goroutine.
-func (GN *GossipNet) Start() {
-	//logger = initLogger("D:\\Documents\\sem7\\clouds_hpc\\task2_gossip\\")
-	logger = initLogger("")
+func (GN *GossipNet) Start(logDir string) {
+	logger = initLogger(logDir)
 	logger.Println(time.Now().String(), " Start")
 	for i:= 0; i < GN.size; i++ {
-		go GN.nodes[i].Process(GN.kill, 5 * time.Second)
+		go GN.nodes[i].Process(GN.kill, GN.round)
 	}
 	time.Sleep(time.Second)
 }

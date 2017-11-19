@@ -1,14 +1,16 @@
 package main
 
 import (
+	"time"
 	"fmt"
 	"github.com/sokks/gossip"
-	//"time"
 )
 
 func main() {
-	gossipNet := gossip.InitNet(4)
-	gossipNet.Start()
+	logDir := "D:/Documents/sem7/cloud_hpc"
+	gossipNet := gossip.InitNet(10, time.Second)
+	gossipNet.Start(logDir)
+	fmt.Println("Gossip simulation startted, see the log")
  	msg := gossip.Message{
 		ID:		1,
 		MsgType:"multicast",
@@ -19,5 +21,5 @@ func main() {
 	gossipNet.MakeRumour(0, msg)
 	fmt.Scanln()
 	gossipNet.Stop()
-	println("finished")
+	fmt.Println("Simulation finished")
 }

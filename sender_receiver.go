@@ -30,6 +30,7 @@ func (r *Receiver) startReceiver() {
 			return
 		default:
 			msg := Message{}
+			// set timeout for non-blocking in case of no messages
 			r.udpConn.SetReadDeadline(time.Now().Add(timeout))
 			n, _, err := r.udpConn.ReadFromUDP(r.buffer)
 			if err != nil {
