@@ -1,24 +1,24 @@
 package gossip
 
 import (
-	"net"
 	"encoding/json"
+	"net"
 	"time"
 )
 
 // Receiver is a non-blocking reader from UDP connection.
 // It has a seporate listening goroutine which puts received
-// data in the channel. 
+// data in the channel.
 type Receiver struct {
-	C chan Message
-	kill chan struct{}
+	C       chan Message
+	kill    chan struct{}
 	udpConn *net.UDPConn
-	buffer []byte
+	buffer  []byte
 }
 
 // NewReceiver constracts a new Receiver object assosiated with udpConn.
 func NewReceiver(udpConn *net.UDPConn) *Receiver {
-	rcvr := &Receiver{make(chan Message, 100), make(chan struct{}), udpConn, make([]byte, 1024)} 
+	rcvr := &Receiver{make(chan Message, 100), make(chan struct{}), udpConn, make([]byte, 1024)}
 	return rcvr
 }
 
@@ -36,7 +36,9 @@ func (r *Receiver) startReceiver() {
 			if err != nil {
 				if e, ok := err.(net.Error); !ok || !e.Timeout() {
 					panic(err)
-				} else { continue }
+				} else {
+					continue
+				}
 			} else {
 				if n != 0 {
 					json.Unmarshal(r.buffer[:n], &msg)
@@ -58,23 +60,23 @@ func (r *Receiver) Stop() {
 }
 
 type senderPack struct {
-	msg 	Message
-	addr 	*net.UDPAddr
+	msg  Message
+	addr *net.UDPAddr
 }
 
-// Sender is a writer to UDP connection.It has a seporate 
-// goroutine which gets task from a channel and sends it. 
+// Sender is a writer to UDP connection.It has a seporate
+// goroutine which gets task from a channel and sends it.
 // Task is a pair of message and its recipient address.
 type Sender struct {
-	C 		chan senderPack
-	kill 	chan struct{}
+	C       chan senderPack
+	kill    chan struct{}
 	udpConn *net.UDPConn
-	buffer 	[]byte
+	buffer  []byte
 }
 
 // NewSender constructs new sender object assosiated with udpConn.
 func NewSender(udpConn *net.UDPConn) *Sender {
-	sndr := &Sender{make(chan senderPack, 100), make(chan struct{}), udpConn, make([]byte, 0, 1024)} 
+	sndr := &Sender{make(chan senderPack, 100), make(chan struct{}), udpConn, make([]byte, 0, 1024)}
 	return sndr
 }
 

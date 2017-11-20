@@ -2,33 +2,33 @@ package gossip
 
 import (
 	"net"
-	"gitlab.com/n-canter/graph"
 	"strconv"
 	"strings"
 	"sync"
+
+	"gitlab.com/n-canter/graph"
 )
 
 type nodeProcessor struct {
-	myID 		int						// unique id of processor in the Net
-	neighbours 	map[int]*net.UDPAddr 	// map[nodeID]nodeAddr
-	msgIDs 		[]int					// slice of already received message IDs
-	ackIDs 		map[int][]int			// map[msgID]slice of node IDs sent ack with msgID
-	msgQueue 	*messageQueue			// queue of messages to send
-	ackQueue 	*messageQueue			// queue of acks to send
-	acks 		map[int][]bool			// map[msgID](slice[nodeID]=true/false)
-										//	 note: if msgID in keys of this map then it was 
-										// 		   send by this node and is tracked by it
-	waiting 	map[int]int 			// map[msgID] counter value on message initialization
-										// 	 note: key is deleted after all ackes recieved
-	m			sync.Mutex				// safe new message initialization
+	myID       int                  // unique id of processor in the Net
+	neighbours map[int]*net.UDPAddr // map[nodeID]nodeAddr
+	msgIDs     []int                // slice of already received message IDs
+	ackIDs     map[int][]int        // map[msgID]slice of node IDs sent ack with msgID
+	msgQueue   *messageQueue        // queue of messages to send
+	ackQueue   *messageQueue        // queue of acks to send
+	acks       map[int][]bool       // map[msgID](slice[nodeID]=true/false)
+	                                //     note: key is deleted after all ackes recieved
+	waiting    map[int]int          // map[msgID] counter value on message initialization
+	                                //      note: key is the flag of initializing message
+	m          sync.Mutex           // safe new message initialization
 }
 
 func newNodeProcessor(id int, neighs []graph.Node) *nodeProcessor {
-	getAddr := func(port int) (*net.UDPAddr) {
+	getAddr := func(port int) *net.UDPAddr {
 		laddr, _ := net.ResolveUDPAddr("udp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
 		return laddr
 	}
-	makeNeighMap := func() (map[int]*net.UDPAddr) {
+	makeNeighMap := func() map[int]*net.UDPAddr {
 		m := make(map[int]*net.UDPAddr)
 		for _, node := range neighs {
 			nid, _ := strconv.Atoi(node.String())
@@ -36,24 +36,24 @@ func newNodeProcessor(id int, neighs []graph.Node) *nodeProcessor {
 		}
 		return m
 	}
-	
+
 	return &nodeProcessor{
-		myID: 		id,
+		myID:       id,
 		neighbours: makeNeighMap(),
-		msgIDs: 	make([]int, 0, 10),
-		ackIDs:		make(map[int][]int),
-		msgQueue:	newMessageQueue(),
-		ackQueue:	newMessageQueue(),
-		acks:		make(map[int][]bool),
-		waiting: 	make(map[int]int),
+		msgIDs:     make([]int, 0, 10),
+		ackIDs:     make(map[int][]int),
+		msgQueue:   newMessageQueue(),
+		ackQueue:   newMessageQueue(),
+		acks:       make(map[int][]bool),
+		waiting:    make(map[int]int),
 	}
 }
 
 // initNewMessage puts msg in the message queue and allocates resources for tracking it
 //
 // TODO: generate unique message id internally
-// TODO: use mutex to avoid data races (though such races have impact 
-// 		 only for delay of including message in the processing)			DONE
+// TODO: use mutex to avoid data races (though such races have impact
+//          only for delay of including message in the processing)            DONE
 func (p *nodeProcessor) initNewMessage(msg Message, netSize, curCounter int) (exists bool) {
 	existingID := func(msgId int) bool {
 		for _, val := range p.msgIDs {
@@ -64,7 +64,7 @@ func (p *nodeProcessor) initNewMessage(msg Message, netSize, curCounter int) (ex
 		return false
 	}
 
-	getDestList := func() ([]int) {
+	getDestList := func() []int {
 		res := make([]int, 0, len(p.neighbours))
 		for key := range p.neighbours {
 			res = append(res, key)
@@ -74,9 +74,9 @@ func (p *nodeProcessor) initNewMessage(msg Message, netSize, curCounter int) (ex
 
 	msgId := msg.ID
 	if !existingID(msgId) { // If such msgId is already known to this node then error is generated
-							// but it doesn't garantee that there are no such msgId in the whole Net.
-							// If it's already exists it will be ignored by nodes or can be processed 
-							// incorrectly.
+		                    // but it doesn't garantee that there are no such msgId in the whole Net.
+		                    // If it's already exists it will be ignored by nodes or can be processed
+		                    // incorrectly.
 		p.m.Lock()
 		p.acks[msgId] = make([]bool, netSize)
 		p.acks[msgId][p.myID] = true
@@ -91,7 +91,7 @@ func (p *nodeProcessor) initNewMessage(msg Message, netSize, curCounter int) (ex
 }
 
 func (p *nodeProcessor) processMsg(msg Message, curCount int) {
-	alreadyReceivedMsg := func(id int) (bool) {
+	alreadyReceivedMsg := func(id int) bool {
 		for _, val := range p.msgIDs {
 			if val == id {
 				return true
@@ -100,7 +100,7 @@ func (p *nodeProcessor) processMsg(msg Message, curCount int) {
 		return false
 	}
 
-	alreadyReceivedAck := func(msgId, nodeId int) (bool) {
+	alreadyReceivedAck := func(msgId, nodeId int) bool {
 		_, hasKey := p.ackIDs[msgId]
 		if hasKey {
 			for _, val := range p.ackIDs[msgId] {
@@ -118,7 +118,7 @@ func (p *nodeProcessor) processMsg(msg Message, curCount int) {
 
 	memorizeAckID := func(msgId, nodeId int) {
 		_, hasKey := p.ackIDs[msgId]
-		
+
 		if !hasKey {
 			p.ackIDs[msgId] = make([]int, 1, 10)
 			p.ackIDs[msgId][0] = nodeId
@@ -128,11 +128,11 @@ func (p *nodeProcessor) processMsg(msg Message, curCount int) {
 	}
 
 	const (
-		ALL = 0
+		ALL          = 0
 		EXCEPTSENDER = 1
 	)
 
-	getDestList := func(mode int) ([]int) {
+	getDestList := func(mode int) []int {
 		res := make([]int, 0, len(p.neighbours))
 		if mode == 0 {
 			for key := range p.neighbours {
@@ -157,7 +157,7 @@ func (p *nodeProcessor) processMsg(msg Message, curCount int) {
 		p.acks[msgId][nodeId] = true
 	}
 
-	ackedByAll := func(msgId int) (bool) {
+	ackedByAll := func(msgId int) bool {
 		for _, val := range p.acks[msgId] {
 			if !val {
 				return false
@@ -213,7 +213,7 @@ func (p *nodeProcessor) getRandomMsg() (Message, *net.UDPAddr, bool) {
 	getAddr := func(id int) *net.UDPAddr {
 		return p.neighbours[id]
 	}
-	
+
 	p.m.Lock()
 	msg, nodeId, empty := p.msgQueue.getMessage()
 	p.m.Unlock()
@@ -228,7 +228,7 @@ func (p *nodeProcessor) getRandomAck() (Message, *net.UDPAddr, bool) {
 	getAddr := func(id int) *net.UDPAddr {
 		return p.neighbours[id]
 	}
-	
+
 	msg, nodeId, empty := p.ackQueue.getMessage()
 	if empty {
 		return Message{}, nil, true

@@ -1,18 +1,18 @@
 package gossip
 
 import (
+	"math/rand"
 	"strconv"
 	"strings"
-	"math/rand"
 )
 
 type preparedMessage struct {
-	msg Message
+	msg              Message
 	distributionList []int
-	ttl int
+	ttl              int
 }
 
-func newPreparedMessage(msg Message, list []int, ttl int) (*preparedMessage) {
+func newPreparedMessage(msg Message, list []int, ttl int) *preparedMessage {
 	return &preparedMessage{msg, list, ttl}
 }
 
@@ -65,7 +65,7 @@ func (q *messageQueue) getMessage() (msg Message, id int, empty bool) {
 	recipient := (*message).distributionList[t]
 	q.q[r].ttl--
 	if q.q[r].ttl == 0 {
-		q.q = append(q.q[:r], q.q[r + 1:]...)
+		q.q = append(q.q[:r], q.q[r+1:]...)
 	}
 	return message.msg, recipient, false
 }

@@ -1,54 +1,54 @@
 package gossip
 
 import (
+	"fmt"
+	"log"
+	"net"
+	"os"
 	"path/filepath"
 	"strconv"
-	"net"
-	"gitlab.com/n-canter/graph"
-	"fmt"
-	"time"
-	"log"
-	"os"
 	"sync"
+	"time"
+
+	"gitlab.com/n-canter/graph"
 )
 
 const (
-	NET_SIZE = 10
+	NET_SIZE  = 10
 	BASE_PORT = 9080
-	TTL = 10
+	TTL       = 10
 )
 
 var (
-	logger *log.Logger
-	logfile *os.File
+	logger   *log.Logger
+	logfile  *os.File
 	testMode bool
 	feedback chan int
 )
 
-
 // GossipNode represents one gossip net peer.
 // It works with UDP connection using internal sender and receiver.
 type GossipNode struct {
-	id 			int
-	port 		int
-	udpConn 	*net.UDPConn
-	receiver 	*Receiver
-	sender 		*Sender
-	processor 	*nodeProcessor
-	counter 	int
-	m 			sync.Mutex
+	id        int
+	port      int
+	udpConn   *net.UDPConn
+	receiver  *Receiver
+	sender    *Sender
+	processor *nodeProcessor
+	counter   int
+	m         sync.Mutex
 }
 
 // NewGossipNode constracts new GossipNode based on its graph place.
-func NewGossipNode (id int, port int, neighs []graph.Node) *GossipNode {
+func NewGossipNode(id int, port int, neighs []graph.Node) *GossipNode {
 	return &GossipNode{
-		id: 		id,
-		port: 		port,
-		udpConn: 	nil,
-		receiver: 	nil,
-		sender: 	nil,
-		processor: 	newNodeProcessor(id, neighs),
-		counter: 	0,
+		id:        id,
+		port:      port,
+		udpConn:   nil,
+		receiver:  nil,
+		sender:    nil,
+		processor: newNodeProcessor(id, neighs),
+		counter:   0,
 	}
 }
 
@@ -80,7 +80,7 @@ func (gn *GossipNode) putNewRumour(msg Message, netSize int) (exists bool) {
 	gn.m.Lock()
 	c := gn.counter
 	gn.m.Unlock()
-	return gn.processor.initNewMessage(msg, netSize, c) 
+	return gn.processor.initNewMessage(msg, netSize, c)
 }
 
 // Process sends messages to random peers every interval and processes incoming messages
@@ -96,12 +96,12 @@ func (gn *GossipNode) Process(kill chan struct{}, interval time.Duration) {
 	defer gn.sender.Stop()
 	for {
 		select {
-		case <-kill:  // got stop signal
+		case <-kill: // got stop signal
 			return
 		case msg := <-gn.receiver.C: // got some message from receiver
 			logger.Printf("[NODE %d] message received %s", gn.id, msg.String())
 			gn.processor.processMsg(msg, gn.counter)
-		case <-ticker.C:  // time for new round
+		case <-ticker.C: // time for new round
 			gn.m.Lock()
 			gn.counter++
 			gn.m.Unlock()
@@ -119,7 +119,7 @@ func (gn *GossipNode) Process(kill chan struct{}, interval time.Duration) {
 	}
 }
 
-// GossipNet represents whole net. It consists of several nodes 
+// GossipNet represents whole net. It consists of several nodes
 // and can be constructed of graph(TODO) or randomly.
 type GossipNet struct {
 	size  int
@@ -130,9 +130,11 @@ type GossipNet struct {
 
 func initLogger(logDirectoryPath string) *log.Logger {
 	var err error
-	filename := "session_" + time.Now().Format("20060102150405") + ".log";
-	logfile, _ = os.OpenFile(filepath.Join(logDirectoryPath, filename), os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
-	if err != nil {fmt.Println("Couldn't open file")}
+	filename := "session_" + time.Now().Format("20060102150405") + ".log"
+	logfile, _ = os.OpenFile(filepath.Join(logDirectoryPath, filename), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		fmt.Println("Couldn't open file")
+	}
 	return log.New(logfile, "TRACE:", log.Ltime)
 }
 
@@ -154,9 +156,9 @@ func InitNet(n int, interval time.Duration) *GossipNet {
 		GNs = append(GNs, gn)
 	}
 	return &GossipNet{
-		size: n,
+		size:  n,
 		nodes: GNs,
-		kill: make(chan struct{}, n),
+		kill:  make(chan struct{}, n),
 		round: interval,
 	}
 }
@@ -175,30 +177,27 @@ func InitNetFromGraph(g graph.Graph, interval time.Duration) *GossipNet {
 		GNs = append(GNs, gn)
 	}
 	return &GossipNet{
-		size: n,
+		size:  n,
 		nodes: GNs,
-		kill: make(chan struct{}, n),
+		kill:  make(chan struct{}, n),
 		round: interval,
 	}
 }
 
-// SetTestMode sets the mode that stops processing 
+// SetTestMode sets the mode that stops processing
 // after first message is acked by all nodes.
-func (GN *GossipNet) SetTestMode() (chan int) {
+func (GN *GossipNet) SetTestMode() chan int {
 	testMode = true
 	feedback = make(chan int)
 	return feedback
 }
-
-// TODO: interval as parameter of the net 			DONE
-// TODO: logger filepath as parameter of Start()	DONE
 
 // Start lanches the gossip simulation. Also it inits the session logger.
 // Each node is launched in the sepotare goroutine.
 func (GN *GossipNet) Start(logDir string) {
 	logger = initLogger(logDir)
 	logger.Println(time.Now().String(), " Start")
-	for i:= 0; i < GN.size; i++ {
+	for i := 0; i < GN.size; i++ {
 		go GN.nodes[i].Process(GN.kill, GN.round)
 	}
 	time.Sleep(time.Second)
@@ -217,11 +216,11 @@ func (GN *GossipNet) Stop() {
 }
 
 type errorString struct {
-    s string
+	s string
 }
 
 func (e *errorString) Error() string {
-    return e.s
+	return e.s
 }
 
 // MakeRumour inits node with id id to generate new message and start tracking it.
