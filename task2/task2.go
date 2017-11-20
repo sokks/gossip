@@ -27,14 +27,14 @@ func main() {
     dataFile := "test_loss.data"
     g := graph.Generate(50, 5, 7, 9080)
     probabilities := []string{"0.1", "0.2", "0.3", "0.4", "0.5"}
-    datafile, err := os.OpenFile(filepath.Join(dataDir, dataFile), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+    datafile, err := os.OpenFile(filepath.Join(dataDir, dataFile), os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
     if err != nil {
         fmt.Println("Can't open data file")
         return
     }
     defer datafile.Close()
     fmt.Println("Start collecting data, wait please")
-    datafile.WriteString("10")
+    datafile.WriteString("10\n")
     datafile.WriteString("0.0\n")
     fmt.Print("Probability 0.0 ...")
     for i:= 0; i < nExperiments; i++ {
@@ -48,11 +48,12 @@ func main() {
             break
         }
         datafile.WriteString(p + "\n")
-        fmt.Print("Probability", p, "...")
+        fmt.Print("Probability ", p, " ...")
         for i := 0; i < nExperiments; i++ {
             doOneTest(g, logDir, datafile)
             fmt.Print(".....")
         }
+        datafile.WriteString("\n")
         fmt.Println("")
         ruleProbability(p, true)
     }
