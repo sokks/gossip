@@ -199,6 +199,9 @@ func (p *nodeProcessor) processMsg(msg Message, curCount int) {
 					dur := getWaitInterval(msg.ID)
 					logger.Printf("[NODE %d] [MESSAGE %d ACKED BY ALL NODES] time passed %d\n", p.myID, msg.ID, dur)
 					deleteTrack(msg.ID)
+					if testMode {
+						feedback <- dur
+					}
 				}
 			}
 			p.msgQueue.putMessage(Message{msg.ID, "notification", p.myID, msg.Origin, msg.Data}, getDestList(EXCEPTSENDER))

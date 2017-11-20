@@ -21,6 +21,8 @@ const (
 var (
 	logger *log.Logger
 	logfile *os.File
+	testMode bool
+	feedback chan int
 )
 
 
@@ -180,6 +182,13 @@ func InitNetFromGraph(g graph.Graph, interval time.Duration) *GossipNet {
 	}
 }
 
+// SetTestMode sets the mode that stops processing 
+// after first message is acked by all nodes.
+func (GN *GossipNet) SetTestMode() (chan int) {
+	testMode = true
+	feedback = make(chan int)
+	return feedback
+}
 
 // TODO: interval as parameter of the net 			DONE
 // TODO: logger filepath as parameter of Start()	DONE
@@ -195,7 +204,10 @@ func (GN *GossipNet) Start(logDir string) {
 	time.Sleep(time.Second)
 }
 
+// TODO: Pause(), Continue(), correct Stop()
+
 // Stop sends stop signals to nodes and closes the session logger.
+// NOTE: It doesn't truncate nodes' resources.
 func (GN *GossipNet) Stop() {
 	for i := 0; i <= GN.size; i++ {
 		GN.kill <- struct{}{}
