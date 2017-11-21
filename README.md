@@ -13,8 +13,7 @@ $ go get github.com/sokks/gossip
 To run task used for graph construction (WARNING: it takes long time):
 ```console
 $ cd `go env GOPATH`/src/github.com/sokks/gossip/task2/
-$ sudo su
-# make task2
+$ sudo make task2
 $ make draw
 ```
 To run peformance data collection (*currently unavailable*):
