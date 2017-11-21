@@ -16,7 +16,6 @@ import (
 const (
 	NET_SIZE  = 10
 	BASE_PORT = 9080
-	TTL       = 10
 )
 
 var (
@@ -24,6 +23,7 @@ var (
 	logfile  *os.File
 	testMode bool
 	feedback chan int
+	TTL int
 )
 
 // GossipNode represents one gossip net peer.
@@ -155,6 +155,7 @@ func InitNet(n int, interval time.Duration) *GossipNet {
 		gn := NewGossipNode(nodeId, nodePort, neighs)
 		GNs = append(GNs, gn)
 	}
+	TTL = 10
 	return &GossipNet{
 		size:  n,
 		nodes: GNs,
@@ -176,6 +177,7 @@ func InitNetFromGraph(g graph.Graph, interval time.Duration) *GossipNet {
 		gn := NewGossipNode(nodeId, nodePort, neighs)
 		GNs = append(GNs, gn)
 	}
+	TTL = 10
 	return &GossipNet{
 		size:  n,
 		nodes: GNs,
@@ -190,6 +192,11 @@ func (GN *GossipNet) SetTestMode() chan int {
 	testMode = true
 	feedback = make(chan int)
 	return feedback
+}
+
+// SetTTL sets TTL of every message upon the parameter
+func (GN *GossipNet) SetTTL(ttl int) {
+	TTL = ttl
 }
 
 // Start lanches the gossip simulation. Also it inits the session logger.

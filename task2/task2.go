@@ -85,6 +85,7 @@ func ruleProbability(p string, toDel bool) bool {
 func doOneTest(g graph.Graph, logDir string, datafile *os.File) {
     gossipNet := gossip.InitNetFromGraph(g, 100 * time.Millisecond)
     feedback := gossipNet.SetTestMode()
+    gossipNet.SetTTL(100)
     gossipNet.Start(logDir)
     msg := gossip.Message{
         ID:        1,
