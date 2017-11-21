@@ -1,4 +1,4 @@
-TASK_DIR=`go env GOPATH`/src/github.com/sokks/gossip/task2
+TASK_DIR=.
 LOG_DIR=$(TASK_DIR)/log
 DATA_DIR=$(TASK_DIR)/data
 task2:
@@ -8,4 +8,4 @@ task2:
 	mkdir -p $(DATA_DIR)
 	`go env GOPATH`/bin/task2 $(LOG_DIR) $(DATA_DIR)
 draw:
-	`which python` $(TASK_DIR)/draw_plot.py $(DATA_DIR)
+	`which python` -W ignore $(TASK_DIR)/draw_plot.py --path $(DATA_DIR)
